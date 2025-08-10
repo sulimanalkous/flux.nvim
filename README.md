@@ -112,7 +112,7 @@ lua/
 │   ├── init.lua         # Chat interface with @EDIT/@READ/@LIST
 │   ├── edit.lua         # Interactive editing with preview  
 │   └── completion.lua   # Async code completion
-└── simple-llm.lua       # Core LLM integration
+└── flux.lua       # Core LLM integration
 ```
 
 ### Key Design Principles
