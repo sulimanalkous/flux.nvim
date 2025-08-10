@@ -1,0 +1,40 @@
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Vim temporary files
+*.swp
+*.swo
+*~
+
+# LLM request temp files
+/tmp/llm_request.json
+/tmp/llm_completion_request.json
+
+# Log files
+*.log
+
+# Neovim specific
+.nvim/
+
+# Local development files
+local_config.lua
+dev_config.lua
+test_*.lua
+
+# IDE files
+.vscode/
+.idea/
+
+# Git files
+*.orig
