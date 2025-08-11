@@ -10,11 +10,13 @@ vim.g.loaded_flux = 1
 -- The require calls here are safe because they only run when the user executes the command,
 -- by which time the plugin will have been fully loaded and configured by lazy.nvim.
 vim.api.nvim_create_user_command("FluxChat", function()
-  require("flux").create_chat_interface()
+  local chat = require("chat")
+  chat.create_interface()
 end, { desc = "Open Flux chat interface" })
 
 vim.api.nvim_create_user_command("FluxToggle", function()
-  require("flux").toggle()
+  local chat = require("chat")
+  chat.toggle()
 end, { desc = "Toggle Flux chat interface" })
 
 vim.api.nvim_create_user_command("FluxCompletion", function(opts)
@@ -59,5 +61,6 @@ end, {
 })
 
 vim.api.nvim_create_user_command("FluxIndexProject", function()
-  require("embedding").index_project()
+  local project_index = require("tools").get_tool("project_index")
+  project_index.index_project()
 end, { desc = "Index project files for RAG" })

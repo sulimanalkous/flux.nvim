@@ -82,13 +82,8 @@ function M.setup(user_config)
   -- Add user commands
   vim.api.nvim_create_user_command("FluxAgent", function()
     local chat = require("chat")
-    if chat.state.chat_buf and vim.api.nvim_buf_is_valid(chat.state.chat_buf) then
-      local win_id = vim.fn.bufwinnr(chat.state.chat_buf)
-      if win_id > 0 and vim.api.nvim_win_is_valid(win_id) then
-        vim.api.nvim_set_current_win(win_id)
-      else
-        chat.create_interface()
-      end
+    if chat.state.container_win and vim.api.nvim_win_is_valid(chat.state.container_win) then
+      vim.api.nvim_set_current_win(chat.state.container_win)
     else
       chat.create_interface()
     end
@@ -97,16 +92,9 @@ function M.setup(user_config)
   vim.api.nvim_create_user_command("FluxReason", function(opts)
     if opts.args and opts.args ~= "" then
       local chat = require("chat")
-      if chat.state.chat_buf and vim.api.nvim_buf_is_valid(chat.state.chat_buf) then
-        local win_id = vim.fn.bufwinnr(chat.state.chat_buf)
-        if win_id > 0 and vim.api.nvim_win_is_valid(win_id) then
-          chat.handle_complex_reasoning(opts.args)
-        else
-          chat.create_interface()
-          vim.defer_fn(function()
-            chat.handle_complex_reasoning(opts.args)
-          end, 100)
-        end
+      if chat.state.container_win and vim.api.nvim_win_is_valid(chat.state.container_win) then
+        vim.api.nvim_set_current_win(chat.state.container_win)
+        chat.handle_complex_reasoning(opts.args)
       else
         chat.create_interface()
         vim.defer_fn(function()
@@ -134,10 +122,7 @@ function M.setup(user_config)
     end
   end, { desc = "Check if project embeddings are loaded" })
 
-  vim.api.nvim_create_user_command("FluxIndexProject", function()
-    local project_index = require("tools").get_tool("project_index")
-    project_index.index_project()
-  end, { desc = "Index project files for AI context" })
+
 
   vim.api.nvim_create_user_command("FluxTestEmbeddings", function(opts)
     if opts.args and opts.args ~= "" then
