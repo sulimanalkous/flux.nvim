@@ -28,8 +28,13 @@ function M.setup(config)
   -- Load all providers
   require("providers.llama_cpp")
   
-  -- Set default provider
-  M.set_provider("llama_cpp")
+  -- Create provider instance with configuration
+  local provider_class = M.providers["llama_cpp"]
+  if provider_class then
+    M.current_provider = provider_class:new(config)
+  else
+    vim.notify("Failed to load llama_cpp provider", vim.log.levels.ERROR)
+  end
   
   -- TODO: Add Ollama provider support
   -- TODO: Add other providers (OpenAI, Anthropic, etc.)

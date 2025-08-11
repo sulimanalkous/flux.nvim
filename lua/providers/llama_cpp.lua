@@ -9,13 +9,22 @@ function M:new(config)
   setmetatable(provider, { __index = M })
   
   -- Default configuration
-  provider.config = vim.tbl_extend("force", {
+  local default_config = {
     host = "localhost",
     port = 1234,
     embedding_host = "localhost", 
     embedding_port = 1235,
     embedding_model = "text-embedding"
-  }, config or {})
+  }
+  
+  -- Handle nested embedding config
+  if config and config.embedding then
+    config.embedding_host = config.embedding.host or config.embedding_host
+    config.embedding_port = config.embedding.port or config.embedding_port
+    config.embedding_model = config.embedding.model or config.embedding_model
+  end
+  
+  provider.config = vim.tbl_extend("force", default_config, config or {})
   
   return provider
 end
