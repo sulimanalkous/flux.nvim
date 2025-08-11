@@ -2,6 +2,7 @@
 local M = {}
 
 local api = vim.api
+local progress = require("ui.progress")
 
 -- Completion state
 M.state = {
@@ -41,6 +42,7 @@ end
 
 -- Async LLM request function
 function M.ask_llm_async(prompt, callback)
+  local config = require("flux").config
   -- Create JSON payload
   local payload = {
     messages = {
@@ -51,7 +53,7 @@ function M.ask_llm_async(prompt, callback)
   }
   
   -- Write to temp file
-  local temp_file = "/tmp/llm_completion_request.json"
+  local temp_file = vim.fn.tempname()
   local file = io.open(temp_file, "w")
   if not file then
     callback(nil, "Failed to create temp file")
@@ -62,7 +64,8 @@ function M.ask_llm_async(prompt, callback)
   file:close()
   
   -- Use async job
-  local curl_cmd = string.format('curl -s http://localhost:1234/v1/chat/completions -H "Content-Type: application/json" -d @%s', temp_file)
+  local url = string.format("http://%s:%d/v1/chat/completions", config.host, config.port)
+  local curl_cmd = string.format('curl -s %s -H "Content-Type: application/json" -d @%s', url, temp_file)
   
   local output_buffer = {}
   
@@ -251,11 +254,14 @@ function M.trigger_completion()
       return
     end
     
+    -- Start progress indicator
+    local handle = progress.start_completion("Generating completion...")
+    
     M.ask_llm_async(prompt, function(response, error)
       M.state.is_completing = false
       
       if error then
-        -- Silently fail - don't spam user
+        progress.error(handle, "Completion failed")
         return
       end
       
@@ -273,7 +279,12 @@ function M.trigger_completion()
           local new_cursor = api.nvim_win_get_cursor(0)
           M.show_completion(completion, context.bufnr, new_cursor[1] - 1, new_cursor[2])
           M.state.last_completion_pos = new_cursor[1] .. "," .. new_cursor[2]
+          progress.complete(handle, "Completion ready")
+        else
+          progress.cancel(handle, "Completion filtered")
         end
+      else
+        progress.cancel(handle, "No completion generated")
       end
     end)
   end)
@@ -320,14 +331,7 @@ end
 
 -- Setup completion keymaps
 function M.setup_keymaps()
-  -- Accept completion with Tab
-  vim.keymap.set("i", "<Tab>", function()
-    if M.accept_completion() then
-      return
-    else
-      return "<Tab>"
-    end
-  end, { expr = true, silent = true })
+  -- No Tab keymap needed - handled by nvim-cmp integration
   
   -- Manual trigger completion
   vim.keymap.set("i", "<C-Space>", function()

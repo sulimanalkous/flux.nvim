@@ -1,16 +1,22 @@
-# 🚀 Flux.nvim
+# 🤖 Flux.nvim
 
-> *AI that flows with your code*
+> *Your intelligent AI coding partner*
 
-A lightning-fast, minimal LLM coding assistant built for developers who want AI superpowers without configuration hell. Chat, complete, and edit code seamlessly with your local LLM.
+A thinking, reasoning AI coding assistant that works with you like a helpful colleague. Built for developers who want an AI partner that can think, plan, debug, and code alongside them - not just complete code.
 
 ## ✨ Features
 
+### 🧠 **Intelligent Agent**
+- **Thinking Partner**: Reason step-by-step, explain your approach, work through problems together
+- **Natural Conversation**: Chat like you're talking to a helpful colleague
+- **Context Awareness**: Understands your entire project and conversation history
+- **Proactive Suggestions**: Suggests improvements and next steps
+
 ### 💬 **Smart Chat Interface**
-- Natural conversation with context awareness
-- File editing directly from chat: *"Fix this code"* → AI edits your buffer
+- Natural conversation with deep reasoning capabilities
+- File editing directly from chat: *"Let's fix this code together"* → AI thinks through the problem and implements the solution
 - File operations: *"Read docs/"*, *"Show me config.lua"*
-- Beautiful markdown interface with real-time responses
+- Beautiful markdown interface with real-time streaming responses
 
 ### 🤖 **Copilot-Style Completion**
 - Real-time code suggestions as you type
@@ -33,6 +39,7 @@ A lightning-fast, minimal LLM coding assistant built for developers who want AI 
 ### Prerequisites
 - Neovim >= 0.8
 - [llama-server](https://github.com/ggerganov/llama.cpp) or compatible LLM server running on `localhost:1234`
+- Embedding model server on `localhost:1235` (optional, for enhanced context)
 - Recommended model: Qwen2.5-Coder-7B-Instruct
 
 ### Installation
@@ -42,7 +49,14 @@ A lightning-fast, minimal LLM coding assistant built for developers who want AI 
 {
   "sulimanalkous/flux.nvim",
   config = function()
-    require("flux").setup()
+    require("flux").setup({
+      host = "localhost",
+      port = 1234,
+      embedding = {
+        host = "localhost", 
+        port = 1235,
+      }
+    })
   end,
 }
 ```
@@ -52,7 +66,14 @@ A lightning-fast, minimal LLM coding assistant built for developers who want AI 
 use {
   "sulimanalkous/flux.nvim",
   config = function()
-    require("flux").setup()
+    require("flux").setup({
+      host = "localhost",
+      port = 1234,
+      embedding = {
+        host = "localhost",
+        port = 1235,
+      }
+    })
   end
 }
 ```
@@ -64,8 +85,11 @@ git clone https://github.com/sulimanalkous/flux.nvim.git ~/.local/share/nvim/sit
 
 ### Setup Your LLM Server
 ```bash
-# Start llama-server (example)
+# Start main model server
 llama-server -m your-model.gguf --port 1234
+
+# Start embedding model server (optional)
+llama-server -m your-embedding-model.gguf --port 1235
 
 # Or use Ollama
 ollama serve
@@ -77,14 +101,17 @@ ollama serve
 ```lua
 <leader>ac  -- Toggle chat interface
 <leader>aa  -- Open chat interface  
+<leader>la  -- Quick agent reasoning session
 Ctrl+S      -- Send message (in chat)
 q           -- Close chat
 ```
 
 **Example conversations:**
-- *"Fix the bugs in this code"* → AI edits your current buffer
-- *"Read docs/README.md"* → AI shows file content  
-- *"List files in src/"* → AI shows directory listing
+- *"What do you think about this code structure?"* → AI analyzes and suggests improvements
+- *"Help me debug this issue - I'm getting an error when..."* → AI thinks through the problem step-by-step
+- *"Let's plan the architecture for this new feature"* → AI helps design and plan
+- *"Can you explain how this algorithm works?"* → AI breaks it down and explains
+- *"I'm stuck on this problem, can you help me think through it?"* → AI works with you to solve it
 
 ### Code Completion
 ```lua
@@ -98,8 +125,7 @@ Ctrl+Space  -- Trigger completion manually
 <leader>ae  -- Edit selection with AI
 <leader>af  -- Edit entire buffer with AI
 <leader>lf  -- Quick fix code
-<leader>le  -- Explain selection
-<leader>lp  -- Ask AI prompt
+<leader>le  -- Explain selected code
 ```
 
 ## 🏗️ Architecture

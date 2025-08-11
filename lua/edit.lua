@@ -3,6 +3,8 @@ local M = {}
 
 local api = vim.api
 local simple_llm = require("simple-llm")
+local progress = require("ui.progress")
+local diff_ui = require("ui.diff")
 
 -- Edit selected code with LLM
 function M.edit_selection()
@@ -132,8 +134,19 @@ Respond with only the modified code, no explanations.
   -- Show processing message
   M.add_result_to_edit(edit_buf, "**Processing...** " .. instruction)
   
+  -- Start progress indicator
+  local handle = progress.start_edit("Processing edit request...")
+  
   -- Send to LLM
   simple_llm.ask_llama(prompt, function(response)
+    if not response then
+      progress.error(handle, "No response received")
+      vim.notify("No response from LLM", vim.log.levels.ERROR)
+      return
+    end
+    
+    progress.update(handle, "Processing AI response...")
+    
     -- Extract code from response
     local new_code = response
     local code_block = response:match("```.-\n(.-)```")
@@ -141,18 +154,13 @@ Respond with only the modified code, no explanations.
       new_code = code_block
     end
     
-    -- Add result to edit buffer
-    M.add_result_to_edit(edit_buf, "**Result:**")
-    M.add_result_to_edit(edit_buf, "```" .. filetype)
-    M.add_result_to_edit(edit_buf, new_code)
-    M.add_result_to_edit(edit_buf, "```")
-    M.add_result_to_edit(edit_buf, "")
-    M.add_result_to_edit(edit_buf, "Press <leader>a to apply these changes")
+    progress.complete(handle, "Edit response ready")
     
-    -- Set up apply keymap
-    vim.keymap.set("n", "<leader>a", function()
-      M.apply_changes(original_buf, new_code, start_line, end_line, edit_buf)
-    end, { buffer = edit_buf, silent = true })
+    -- Close the edit buffer
+    api.nvim_buf_delete(edit_buf, { force = true })
+    
+    -- Show diff interface instead of immediately applying
+    M.show_edit_diff(original_buf, new_code, start_line, end_line, instruction)
   end)
 end
 
@@ -169,7 +177,48 @@ function M.add_result_to_edit(buf, text)
   end
 end
 
--- Apply changes to original buffer
+-- Show diff interface for edit results
+function M.show_edit_diff(original_buf, new_code, start_line, end_line, instruction)
+  if not original_buf or not api.nvim_buf_is_valid(original_buf) then
+    vim.notify("Original buffer is no longer valid", vim.log.levels.ERROR)
+    return
+  end
+  
+  local title = "Edit: " .. (instruction or "AI Code Edit")
+  
+  if start_line == 0 and end_line == -1 then
+    -- Full buffer edit
+    diff_ui.show_edit_diff(original_buf, new_code, title)
+  else
+    -- Partial edit - need to reconstruct full content
+    local original_lines = api.nvim_buf_get_lines(original_buf, 0, -1, false)
+    local new_lines = vim.split(new_code, "\n")
+    
+    -- Create full modified content
+    local modified_lines = {}
+    
+    -- Add lines before the edit
+    for i = 1, start_line do
+      table.insert(modified_lines, original_lines[i])
+    end
+    
+    -- Add new lines
+    for _, line in ipairs(new_lines) do
+      table.insert(modified_lines, line)
+    end
+    
+    -- Add lines after the edit (if end_line is not -1)
+    if end_line ~= -1 then
+      for i = end_line + 1, #original_lines do
+        table.insert(modified_lines, original_lines[i])
+      end
+    end
+    
+    diff_ui.show_diff(original_lines, modified_lines, original_buf, title)
+  end
+end
+
+-- Apply changes to original buffer (legacy function, kept for compatibility)
 function M.apply_changes(original_buf, new_code, start_line, end_line, edit_buf)
   local new_lines = vim.split(new_code, "\n")
   
@@ -178,8 +227,10 @@ function M.apply_changes(original_buf, new_code, start_line, end_line, edit_buf)
   
   vim.notify("Changes applied!", vim.log.levels.INFO)
   
-  -- Close edit buffer
-  api.nvim_buf_delete(edit_buf, { force = true })
+  -- Close edit buffer if provided
+  if edit_buf and api.nvim_buf_is_valid(edit_buf) then
+    api.nvim_buf_delete(edit_buf, { force = true })
+  end
 end
 
 -- Add string trim function if not available

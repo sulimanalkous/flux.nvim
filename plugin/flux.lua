@@ -6,35 +6,9 @@ if vim.g.loaded_flux then
 end
 vim.g.loaded_flux = 1
 
--- Setup Flux.nvim
-local function setup_flux()
-  local ok, flux = pcall(require, "flux")
-  if not ok then
-    vim.notify("Flux.nvim: Failed to load plugin", vim.log.levels.ERROR)
-    return
-  end
-  
-  flux.setup()
-end
-
--- Setup simple-llm core
-local function setup_simple_llm()
-  local ok, simple_llm = pcall(require, "simple-llm")
-  if not ok then
-    vim.notify("Flux.nvim: Failed to load simple-llm core", vim.log.levels.ERROR)
-    return
-  end
-  
-  simple_llm.setup()
-end
-
--- Initialize plugin
-vim.defer_fn(function()
-  setup_flux()
-  setup_simple_llm()
-end, 0)
-
 -- Create user commands
+-- The require calls here are safe because they only run when the user executes the command,
+-- by which time the plugin will have been fully loaded and configured by lazy.nvim.
 vim.api.nvim_create_user_command("FluxChat", function()
   require("flux").create_chat_interface()
 end, { desc = "Open Flux chat interface" })
@@ -44,7 +18,7 @@ vim.api.nvim_create_user_command("FluxToggle", function()
 end, { desc = "Toggle Flux chat interface" })
 
 vim.api.nvim_create_user_command("FluxCompletion", function(opts)
-  local flux_completion = require("flux.completion")
+  local flux_completion = require("completion")
   if opts.args == "toggle" then
     flux_completion.state.enabled = not flux_completion.state.enabled
     local status = flux_completion.state.enabled and "enabled" or "disabled"
@@ -54,10 +28,36 @@ vim.api.nvim_create_user_command("FluxCompletion", function(opts)
   else
     vim.notify("Usage: :FluxCompletion toggle|trigger", vim.log.levels.WARN)
   end
-end, { 
-  desc = "Control Flux completion", 
+end, {
+  desc = "Control Flux completion",
   nargs = 1,
   complete = function()
     return {"toggle", "trigger"}
   end
 })
+
+vim.api.nvim_create_user_command("FluxModel", function(opts)
+  local simple_llm = require("simple-llm")
+  if opts.args == "detect" then
+    simple_llm.reset_model_detection()
+    simple_llm.detect_model_type()
+  elseif opts.args == "reset" then
+    simple_llm.reset_model_detection()
+  elseif opts.args == "status" then
+    local model_type = simple_llm.detect_model_type()
+    local config = simple_llm.get_model_config()
+    vim.notify("Current model: " .. model_type .. "\nConfig: " .. vim.inspect(config), vim.log.levels.INFO)
+  else
+    vim.notify("Usage: :FluxModel detect|reset|status", vim.log.levels.WARN)
+  end
+end, {
+  desc = "Manage Flux model detection",
+  nargs = 1,
+  complete = function()
+    return {"detect", "reset", "status"}
+  end
+})
+
+vim.api.nvim_create_user_command("FluxIndexProject", function()
+  require("embedding").index_project()
+end, { desc = "Index project files for RAG" })
