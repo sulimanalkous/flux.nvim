@@ -100,19 +100,22 @@ function M.create_interface()
   state.state.input_win = input_win
   state.state.status_win = status_win
   
-  -- Now set the window heights properly
-  -- Get the total container height
-  local container_height = api.nvim_win_get_height(container_win)
+  -- Now set the window heights properly using vim.cmd for better compatibility
+  -- Switch to input window and resize it
+  api.nvim_set_current_win(input_win)
+  local input_height = 2  -- Fixed small height for input
+  vim.cmd("resize " .. input_height)
   
-  -- Calculate heights (result gets remaining space, input 5%, status 3%)
-  local input_height = math.max(2, math.floor(container_height * 0.05))
-  local status_height = math.max(1, math.floor(container_height * 0.03))
+  -- Switch to status window and resize it
+  api.nvim_set_current_win(status_win)
+  local status_height = 1  -- Fixed small height for status
+  vim.cmd("resize " .. status_height)
   
-  -- Set the heights
-  api.nvim_win_set_height(input_win, input_height)
-  api.nvim_win_set_height(status_win, status_height)
+  -- Switch back to input window for focus
+  api.nvim_set_current_win(input_win)
   
-  -- Result window will automatically take the remaining space
+  -- Debug: Print the heights we're setting
+  vim.notify("Flux.nvim: Set input height to " .. input_height .. ", status height to " .. status_height, vim.log.levels.DEBUG)
   
   -- Set initial content for result window
   local welcome_lines = {
