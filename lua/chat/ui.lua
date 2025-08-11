@@ -93,6 +93,10 @@ end
 function M.setup_keymaps()
   local opts = { buffer = state.state.input_buf, silent = true }
   
+  -- Clear existing keymaps first to prevent duplicates
+  vim.keymap.del({"n", "i"}, "<C-s>", { buffer = state.state.input_buf })
+  vim.keymap.del("n", "q", { buffer = state.state.chat_buf })
+  
   -- Send message with Ctrl+S
   vim.keymap.set({"n", "i"}, "<C-s>", function()
     require("chat.input").send_message()

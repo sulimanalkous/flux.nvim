@@ -10,6 +10,12 @@ end
 
 -- Send message to LLM
 function M.send_message()
+  -- Prevent multiple simultaneous sends
+  if state.state.is_streaming then
+    vim.notify("Already processing a message, please wait...", vim.log.levels.WARN)
+    return
+  end
+
   -- Get the last line (input line) from the chat buffer
   local all_lines = api.nvim_buf_get_lines(state.state.chat_buf, 0, -1, false)
   local last_line = all_lines[#all_lines] or ""
@@ -19,6 +25,12 @@ function M.send_message()
     vim.notify("Please enter a message", vim.log.levels.WARN)
     return
   end
+
+  -- Set streaming state to prevent multiple sends
+  state.state.is_streaming = true
+
+  -- Debug: Log the message being sent
+  vim.notify("Flux.nvim: Sending message: " .. message:sub(1, 50), vim.log.levels.DEBUG)
 
   -- Remove the input line and add user message
   api.nvim_buf_set_lines(state.state.chat_buf, #all_lines - 1, #all_lines, false, {})
