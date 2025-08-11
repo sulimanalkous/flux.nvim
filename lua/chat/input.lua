@@ -22,10 +22,10 @@ function M.send_message()
     return
   end
 
-  -- Get the last line (input line) from the chat buffer
-  local all_lines = api.nvim_buf_get_lines(state.state.chat_buf, 0, -1, false)
-  local last_line = all_lines[#all_lines] or ""
-  local message = last_line:gsub("^%*%*Ask:%*%* ", ""):trim()
+  -- Get the input line from the input buffer
+  local input_lines = api.nvim_buf_get_lines(state.state.input_buf, 0, -1, false)
+  local input_line = input_lines[1] or ""
+  local message = input_line:gsub("^%*%*Ask:%*%* ", ""):trim()
 
   if message == "" then
     vim.notify("Please enter a message", vim.log.levels.WARN)
@@ -51,8 +51,8 @@ function M.send_message()
   local trace = debug.traceback()
   vim.notify("Flux.nvim: Call stack: " .. trace:sub(1, 200), vim.log.levels.DEBUG)
 
-  -- Remove the input line and add user message
-  api.nvim_buf_set_lines(state.state.chat_buf, #all_lines - 1, #all_lines, false, {})
+  -- Clear input buffer and add user message to result buffer
+  api.nvim_buf_set_lines(state.state.input_buf, 0, -1, false, {"**Ask:** "})
   require("chat.ui").add_to_chat("**You:** " .. message)
   require("chat.ui").add_to_chat("")
 
@@ -119,33 +119,18 @@ function M.send_message()
   require("chat.messages").process_regular_message(message)
 end
 
--- Add input prompt to the end of the chat buffer
+-- Add input prompt to the input buffer
 function M.add_input_prompt()
-  require("chat.ui").add_to_chat("**Ask:** ")
-  -- Move cursor to the input line
-  local lines = api.nvim_buf_get_lines(state.state.chat_buf, 0, -1, false)
-  local line_count = #lines
-  if line_count > 0 then
-    -- Ensure cursor position is within bounds
-    local cursor_line = math.max(1, line_count)
-    local cursor_col = math.min(7, #lines[cursor_line])
-    pcall(api.nvim_win_set_cursor, api.nvim_get_current_win(), {cursor_line, cursor_col})
+  -- Clear input buffer and add prompt
+  api.nvim_buf_set_lines(state.state.input_buf, 0, -1, false, {"**Ask:** "})
+  
+  -- Switch to input window and position cursor
+  local input_win = vim.fn.bufwinnr(state.state.input_buf)
+  if input_win ~= -1 and api.nvim_win_is_valid(input_win) then
+    api.nvim_set_current_win(input_win)
+    pcall(api.nvim_win_set_cursor, input_win, {1, 7}) -- After "**Ask:** "
+    vim.cmd("startinsert")
   end
-  
-  -- Temporarily disable completion for input
-  local original_complete = vim.bo[state.state.chat_buf].complete
-  local original_completeopt = vim.bo[state.state.chat_buf].completeopt
-  
-  api.nvim_buf_set_option(state.state.chat_buf, "complete", "")
-  api.nvim_buf_set_option(state.state.chat_buf, "completeopt", "")
-  
-  vim.cmd("startinsert")
-  
-  -- Restore completion settings after a short delay
-  vim.defer_fn(function()
-    api.nvim_buf_set_option(state.state.chat_buf, "complete", original_complete)
-    api.nvim_buf_set_option(state.state.chat_buf, "completeopt", original_completeopt)
-  end, 100)
 end
 
 return M

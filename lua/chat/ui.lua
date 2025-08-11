@@ -19,35 +19,56 @@ function M.create_interface()
     end
   end
 
-  -- Create main window split
-  local width = math.floor(vim.o.columns * 0.4)
+  -- Create split layout: result window (80%) on top, input window (20%) on bottom
+  local total_height = vim.o.lines - 4 -- Account for status line and command line
+  local result_height = math.floor(total_height * 0.8)
+  local input_height = math.floor(total_height * 0.2)
   
-  -- Create single chat buffer for both chat and input
+  -- Create result buffer (for AI responses)
   state.state.chat_buf = api.nvim_create_buf(false, true)
   api.nvim_buf_set_option(state.state.chat_buf, "buftype", "nofile")
   api.nvim_buf_set_option(state.state.chat_buf, "filetype", "markdown")
-  pcall(api.nvim_buf_set_name, state.state.chat_buf, "LLM_CHAT_" .. os.time())
+  pcall(api.nvim_buf_set_name, state.state.chat_buf, "LLM_RESULT_" .. os.time())
   
-  -- Use the same buffer for input (no separate input buffer)
-  state.state.input_buf = state.state.chat_buf
+  -- Create input buffer (for user input)
+  state.state.input_buf = api.nvim_create_buf(false, true)
+  api.nvim_buf_set_option(state.state.input_buf, "buftype", "nofile")
+  api.nvim_buf_set_option(state.state.input_buf, "filetype", "markdown")
+  pcall(api.nvim_buf_set_name, state.state.input_buf, "LLM_INPUT_" .. os.time())
   
-  -- Open chat window on the right
-  vim.cmd("vsplit")
-  local win = api.nvim_get_current_win()
-  api.nvim_win_set_buf(win, state.state.chat_buf)
-  api.nvim_win_set_width(win, width)
+  -- Create horizontal split
+  vim.cmd("split")
   
-  -- Set text wrapping options for chat window
-  api.nvim_win_set_option(win, "wrap", true)
-  api.nvim_win_set_option(win, "linebreak", true)
-  api.nvim_win_set_option(win, "breakindent", true)
-  api.nvim_win_set_option(win, "showbreak", "↳ ")
+  -- Set up result window (top 80%)
+  local result_win = api.nvim_get_current_win()
+  api.nvim_win_set_buf(result_win, state.state.chat_buf)
+  api.nvim_win_set_height(result_win, result_height)
   
-  -- Disable completion for chat buffer to prevent interference
+  -- Set text wrapping options for result window
+  api.nvim_win_set_option(result_win, "wrap", true)
+  api.nvim_win_set_option(result_win, "linebreak", true)
+  api.nvim_win_set_option(result_win, "breakindent", true)
+  api.nvim_win_set_option(result_win, "showbreak", "↳ ")
+  
+  -- Disable completion for result buffer to prevent interference
   api.nvim_buf_set_option(state.state.chat_buf, "complete", "")
   api.nvim_buf_set_option(state.state.chat_buf, "completeopt", "")
   
-  -- Set initial content
+  -- Set up input window (bottom 20%)
+  vim.cmd("wincmd j") -- Move to bottom window
+  local input_win = api.nvim_get_current_win()
+  api.nvim_win_set_buf(input_win, state.state.input_buf)
+  api.nvim_win_set_height(input_win, input_height)
+  
+  -- Set options for input window
+  api.nvim_win_set_option(input_win, "wrap", true)
+  api.nvim_win_set_option(input_win, "linebreak", true)
+  
+  -- Disable completion for input buffer
+  api.nvim_buf_set_option(state.state.input_buf, "complete", "")
+  api.nvim_buf_set_option(state.state.input_buf, "completeopt", "")
+  
+  -- Set initial content for result window
   local welcome_lines = {
     "# 🤖 Flux.nvim - Your AI Coding Partner",
     "",
@@ -81,34 +102,39 @@ function M.create_interface()
     "",
     "---",
     "",
-    "**Ask:** ",
   }
   api.nvim_buf_set_lines(state.state.chat_buf, 0, -1, false, welcome_lines)
   
-  -- Set up keymaps for this buffer
+  -- Set initial content for input window
+  local input_lines = {
+    "**Ask:** ",
+  }
+  api.nvim_buf_set_lines(state.state.input_buf, 0, -1, false, input_lines)
+  
+  -- Set up keymaps for both buffers
   M.setup_keymaps()
   
-  -- Focus on input area at the bottom
+  -- Focus on input window and position cursor
+  vim.cmd("wincmd j") -- Move to input window
   vim.cmd("startinsert")
-  -- Set cursor to the last line, after "**Ask:** "
-  local last_line = #welcome_lines
-  local last_line_content = welcome_lines[last_line]
-  local cursor_col = math.min(7, #last_line_content)
-  pcall(api.nvim_win_set_cursor, win, {last_line, cursor_col})
+  -- Set cursor to the input line, after "**Ask:** "
+  local input_lines = api.nvim_buf_get_lines(state.state.input_buf, 0, -1, false)
+  if #input_lines > 0 then
+    local last_line_content = input_lines[1]
+    local cursor_col = math.min(7, #last_line_content)
+    pcall(api.nvim_win_set_cursor, api.nvim_get_current_win(), {1, cursor_col})
+  end
 end
 
 -- Set up keymaps for chat interface
 function M.setup_keymaps()
-  local opts = { buffer = state.state.input_buf, silent = true }
-  
-  -- Clear existing keymaps first to prevent duplicates (use pcall to handle non-existent mappings)
+  -- Clear existing keymaps first to prevent duplicates
   pcall(vim.keymap.del, {"n", "i"}, "<C-s>", { buffer = state.state.input_buf })
   pcall(vim.keymap.del, "n", "q", { buffer = state.state.chat_buf })
   
-  -- Check if keymap already exists to prevent duplicates (use pcall for compatibility)
+  -- Check if keymap already exists to prevent duplicates
   local has_keymap = false
   pcall(function()
-    -- Try to get the keymap - this will fail if it doesn't exist
     local existing = vim.fn.maparg("<C-s>", "i", false, true)
     if existing and existing.buffer == state.state.input_buf then
       has_keymap = true
@@ -120,12 +146,12 @@ function M.setup_keymaps()
     return
   end
   
-  -- Send message with Ctrl+S (only in insert mode to prevent conflicts)
+  -- Send message with Ctrl+S in input buffer
   vim.keymap.set("i", "<C-s>", function()
     require("chat.input").send_message()
-  end, opts)
+  end, { buffer = state.state.input_buf, silent = true })
   
-  -- Close chat
+  -- Close chat from result buffer
   vim.keymap.set("n", "q", function()
     M.close()
   end, { buffer = state.state.chat_buf, silent = true })
