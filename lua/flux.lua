@@ -19,8 +19,17 @@ function M.setup(user_config)
   -- Merge user config with defaults
   M.config = vim.tbl_deep_extend("force", M.config, user_config or {})
 
-  -- Import modules inside setup to ensure config is ready
+  -- Initialize new module architecture
+  local providers = require("providers")
+  local tools = require("tools")
   local chat = require("chat")
+  
+  -- Setup providers and tools
+  providers.setup(M.config)
+  tools.setup()
+  chat.setup()
+
+  -- Import legacy modules
   local simple_llm = require("simple-llm")
   local edit = require("edit")
   local completion = require("completion")
@@ -110,8 +119,8 @@ function M.setup(user_config)
   end, { nargs = 1, desc = "Start a reasoning session with Flux Agent" })
 
   vim.api.nvim_create_user_command("FluxCheckEmbeddings", function()
-    local embedding = require("embedding")
-    local embeddings_data = embedding.load_embeddings()
+    local project_index = require("tools").get_tool("project_index")
+    local embeddings_data = project_index.load_embeddings()
     if embeddings_data then
       local file_count = 0
       local chunk_count = 0
@@ -126,18 +135,19 @@ function M.setup(user_config)
   end, { desc = "Check if project embeddings are loaded" })
 
   vim.api.nvim_create_user_command("FluxIndexProject", function()
-    local embedding = require("embedding")
-    embedding.index_project()
+    local project_index = require("tools").get_tool("project_index")
+    project_index.index_project()
   end, { desc = "Index project files for AI context" })
 
   vim.api.nvim_create_user_command("FluxTestEmbeddings", function(opts)
     if opts.args and opts.args ~= "" then
-      local embedding = require("embedding")
-      local simple_llm = require("simple-llm")
+      local project_index = require("tools").get_tool("project_index")
+      local providers = require("providers")
+      local provider = providers.get_provider()
       
       vim.notify("Testing embeddings for query: " .. opts.args, vim.log.levels.INFO)
       
-      simple_llm.ask_embedding(opts.args, function(query_embedding, err)
+      provider:embed(opts.args, function(query_embedding, err)
         if err or not query_embedding then
           vim.notify("Embedding test failed: " .. (err or "Unknown error"), vim.log.levels.ERROR)
           return
@@ -145,7 +155,7 @@ function M.setup(user_config)
         
         vim.notify(string.format("Query embedding generated: %d dimensions", #query_embedding), vim.log.levels.INFO)
         
-        local chunks = embedding.find_relevant_chunks(query_embedding, 3)
+        local chunks = project_index.find_relevant_chunks(query_embedding, 3)
         if #chunks > 0 then
           vim.notify(string.format("Embedding test successful! Found %d relevant chunks.", #chunks), vim.log.levels.INFO)
           for i, chunk in ipairs(chunks) do
@@ -162,8 +172,8 @@ function M.setup(user_config)
   end, { nargs = 1, desc = "Test embeddings with a query" })
 
   vim.api.nvim_create_user_command("FluxInspectEmbeddings", function()
-    local embedding = require("embedding")
-    local embeddings_data = embedding.load_embeddings()
+    local project_index = require("tools").get_tool("project_index")
+    local embeddings_data = project_index.load_embeddings()
     
     if not embeddings_data then
       vim.notify("No embeddings data found. Run :FluxIndexProject first.", vim.log.levels.WARN)
@@ -187,13 +197,14 @@ function M.setup(user_config)
   end, { desc = "Inspect stored embeddings data" })
 
   vim.api.nvim_create_user_command("FluxTestEmbeddingServer", function()
-    local simple_llm = require("simple-llm")
+    local providers = require("providers")
+    local provider = providers.get_provider()
     local config = require("flux").config
     
     vim.notify("Testing embedding server connection...", vim.log.levels.INFO)
     vim.notify(string.format("Embedding server: %s:%d, model: %s", config.embedding.host, config.embedding.port, config.embedding.model), vim.log.levels.INFO)
     
-    simple_llm.ask_embedding("test", function(embedding, err)
+    provider:embed("test", function(embedding, err)
       if err then
         vim.notify("Embedding server test failed: " .. err, vim.log.levels.ERROR)
         vim.notify("This suggests either:", vim.log.levels.WARN)
