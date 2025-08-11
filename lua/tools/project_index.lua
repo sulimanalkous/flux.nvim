@@ -2,7 +2,7 @@ local M = {}
 
 -- Index project files for RAG
 function M.index_project()
-  local handle = require("ui.progress").start_index("Indexing project files...")
+  local handle = require("ui.progress").start("index", "Indexing project files...")
   
   -- Get current working directory
   local cwd = vim.fn.getcwd()
