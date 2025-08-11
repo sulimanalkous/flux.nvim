@@ -131,7 +131,21 @@ function M.add_input_prompt()
     local cursor_col = math.min(7, #lines[cursor_line])
     pcall(api.nvim_win_set_cursor, api.nvim_get_current_win(), {cursor_line, cursor_col})
   end
+  
+  -- Temporarily disable completion for input
+  local original_complete = vim.bo[state.state.chat_buf].complete
+  local original_completeopt = vim.bo[state.state.chat_buf].completeopt
+  
+  api.nvim_buf_set_option(state.state.chat_buf, "complete", "")
+  api.nvim_buf_set_option(state.state.chat_buf, "completeopt", "")
+  
   vim.cmd("startinsert")
+  
+  -- Restore completion settings after a short delay
+  vim.defer_fn(function()
+    api.nvim_buf_set_option(state.state.chat_buf, "complete", original_complete)
+    api.nvim_buf_set_option(state.state.chat_buf, "completeopt", original_completeopt)
+  end, 100)
 end
 
 return M

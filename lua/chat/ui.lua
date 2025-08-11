@@ -43,6 +43,10 @@ function M.create_interface()
   api.nvim_win_set_option(win, "breakindent", true)
   api.nvim_win_set_option(win, "showbreak", "↳ ")
   
+  -- Disable completion for chat buffer to prevent interference
+  api.nvim_buf_set_option(state.state.chat_buf, "complete", "")
+  api.nvim_buf_set_option(state.state.chat_buf, "completeopt", "")
+  
   -- Set initial content
   local welcome_lines = {
     "# 🤖 Flux.nvim - Your AI Coding Partner",
@@ -86,7 +90,11 @@ function M.create_interface()
   
   -- Focus on input area at the bottom
   vim.cmd("startinsert")
-  api.nvim_win_set_cursor(win, {#welcome_lines, 7}) -- After "**Ask:** "
+  -- Set cursor to the last line, after "**Ask:** "
+  local last_line = #welcome_lines
+  local last_line_content = welcome_lines[last_line]
+  local cursor_col = math.min(7, #last_line_content)
+  pcall(api.nvim_win_set_cursor, win, {last_line, cursor_col})
 end
 
 -- Set up keymaps for chat interface
@@ -171,7 +179,13 @@ function M.scroll_to_bottom()
   local chat_win = vim.fn.bufwinnr(state.state.chat_buf)
   if chat_win ~= -1 and api.nvim_win_is_valid(chat_win) then
     local lines = api.nvim_buf_get_lines(state.state.chat_buf, 0, -1, false)
-    pcall(api.nvim_win_set_cursor, chat_win, {#lines, 0})
+    local line_count = #lines
+    if line_count > 0 then
+      -- Position cursor at the end of the last line
+      local last_line_content = lines[line_count]
+      local cursor_col = math.max(0, #last_line_content)
+      pcall(api.nvim_win_set_cursor, chat_win, {line_count, cursor_col})
+    end
   end
 end
 
