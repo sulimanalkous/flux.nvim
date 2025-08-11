@@ -104,9 +104,9 @@ function M.create_interface()
   -- Get the total container height
   local container_height = api.nvim_win_get_height(container_win)
   
-  -- Calculate heights (result gets remaining space, input 20%, status 5%)
-  local input_height = math.max(3, math.floor(container_height * 0.2))
-  local status_height = math.max(1, math.floor(container_height * 0.05))
+  -- Calculate heights (result gets remaining space, input 5%, status 3%)
+  local input_height = math.max(2, math.floor(container_height * 0.05))
+  local status_height = math.max(1, math.floor(container_height * 0.03))
   
   -- Set the heights
   api.nvim_win_set_height(input_win, input_height)
