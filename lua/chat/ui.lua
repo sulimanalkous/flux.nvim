@@ -19,10 +19,14 @@ function M.create_interface()
     end
   end
 
-  -- Create split layout: result window (80%) on top, input window (20%) on bottom
-  local total_height = vim.o.lines - 4 -- Account for status line and command line
-  local result_height = math.floor(total_height * 0.8)
-  local input_height = math.floor(total_height * 0.2)
+    -- Create sidebar container on the right side
+  local sidebar_width = math.floor(vim.o.columns * 0.4) -- 40% of screen width
+  
+  -- Create container buffer (this will hold all our windows)
+  state.state.container_buf = api.nvim_create_buf(false, true)
+  api.nvim_buf_set_option(state.state.container_buf, "buftype", "nofile")
+  api.nvim_buf_set_option(state.state.container_buf, "filetype", "FluxSidebar")
+  pcall(api.nvim_buf_set_name, state.state.container_buf, "FLUX_SIDEBAR_" .. os.time())
   
   -- Create result buffer (for AI responses)
   state.state.chat_buf = api.nvim_create_buf(false, true)
@@ -36,13 +40,28 @@ function M.create_interface()
   api.nvim_buf_set_option(state.state.input_buf, "filetype", "markdown")
   pcall(api.nvim_buf_set_name, state.state.input_buf, "LLM_INPUT_" .. os.time())
   
-  -- Create horizontal split
+  -- Create status buffer (for status bar)
+  state.state.status_buf = api.nvim_create_buf(false, true)
+  api.nvim_buf_set_option(state.state.status_buf, "buftype", "nofile")
+  api.nvim_buf_set_option(state.state.status_buf, "filetype", "FluxStatus")
+  pcall(api.nvim_buf_set_name, state.state.status_buf, "FLUX_STATUS_" .. os.time())
+  
+  -- Create vertical split for sidebar container
+  vim.cmd("vsplit")
+  local container_win = api.nvim_get_current_win()
+  api.nvim_win_set_buf(container_win, state.state.container_buf)
+  api.nvim_win_set_width(container_win, sidebar_width)
+  
+  -- Store container window ID for management
+  state.state.container_win = container_win
+  
+  -- Now create the internal windows within the container
+  -- First, create horizontal split inside container for result and input
   vim.cmd("split")
   
-  -- Set up result window (top 80%)
+  -- Set up result window (top, auto height)
   local result_win = api.nvim_get_current_win()
   api.nvim_win_set_buf(result_win, state.state.chat_buf)
-  api.nvim_win_set_height(result_win, result_height)
   
   -- Set text wrapping options for result window
   api.nvim_win_set_option(result_win, "wrap", true)
@@ -58,6 +77,10 @@ function M.create_interface()
   vim.cmd("wincmd j") -- Move to bottom window
   local input_win = api.nvim_get_current_win()
   api.nvim_win_set_buf(input_win, state.state.input_buf)
+  
+  -- Calculate input height (20% of container height)
+  local container_height = api.nvim_win_get_height(container_win)
+  local input_height = math.floor(container_height * 0.2)
   api.nvim_win_set_height(input_win, input_height)
   
   -- Set options for input window
@@ -67,6 +90,24 @@ function M.create_interface()
   -- Disable completion for input buffer
   api.nvim_buf_set_option(state.state.input_buf, "complete", "")
   api.nvim_buf_set_option(state.state.input_buf, "completeopt", "")
+  
+  -- Create status window (bottom 5%)
+  vim.cmd("split")
+  local status_win = api.nvim_get_current_win()
+  api.nvim_win_set_buf(status_win, state.state.status_buf)
+  
+  -- Calculate status height (5% of container height)
+  local status_height = math.floor(container_height * 0.05)
+  api.nvim_win_set_height(status_win, status_height)
+  
+  -- Set options for status window
+  api.nvim_win_set_option(status_win, "wrap", false)
+  api.nvim_win_set_option(status_win, "linebreak", false)
+  
+  -- Store window IDs for management
+  state.state.result_win = result_win
+  state.state.input_win = input_win
+  state.state.status_win = status_win
   
   -- Set initial content for result window
   local welcome_lines = {
@@ -111,18 +152,24 @@ function M.create_interface()
   }
   api.nvim_buf_set_lines(state.state.input_buf, 0, -1, false, input_lines)
   
-  -- Set up keymaps for both buffers
+  -- Set initial content for status window
+  local status_lines = {
+    "🤖 Flux.nvim - Ready",
+  }
+  api.nvim_buf_set_lines(state.state.status_buf, 0, -1, false, status_lines)
+  
+  -- Set up keymaps for all buffers
   M.setup_keymaps()
   
   -- Focus on input window and position cursor
-  vim.cmd("wincmd j") -- Move to input window
+  api.nvim_set_current_win(state.state.input_win)
   vim.cmd("startinsert")
   -- Set cursor to the input line, after "**Ask:** "
   local input_lines = api.nvim_buf_get_lines(state.state.input_buf, 0, -1, false)
   if #input_lines > 0 then
     local last_line_content = input_lines[1]
     local cursor_col = math.min(7, #last_line_content)
-    pcall(api.nvim_win_set_cursor, api.nvim_get_current_win(), {1, cursor_col})
+    pcall(api.nvim_win_set_cursor, state.state.input_win, {1, cursor_col})
   end
 end
 
@@ -131,6 +178,7 @@ function M.setup_keymaps()
   -- Clear existing keymaps first to prevent duplicates
   pcall(vim.keymap.del, {"n", "i"}, "<C-s>", { buffer = state.state.input_buf })
   pcall(vim.keymap.del, "n", "q", { buffer = state.state.chat_buf })
+  pcall(vim.keymap.del, "n", "q", { buffer = state.state.container_buf })
   
   -- Check if keymap already exists to prevent duplicates
   local has_keymap = false
@@ -151,28 +199,59 @@ function M.setup_keymaps()
     require("chat.input").send_message()
   end, { buffer = state.state.input_buf, silent = true })
   
-  -- Close chat from result buffer
+  -- Close entire sidebar from any buffer in the container
   vim.keymap.set("n", "q", function()
     M.close()
   end, { buffer = state.state.chat_buf, silent = true })
+  
+  vim.keymap.set("n", "q", function()
+    M.close()
+  end, { buffer = state.state.input_buf, silent = true })
+  
+  vim.keymap.set("n", "q", function()
+    M.close()
+  end, { buffer = state.state.status_buf, silent = true })
+  
+  vim.keymap.set("n", "q", function()
+    M.close()
+  end, { buffer = state.state.container_buf, silent = true })
 end
 
--- Close chat interface
+-- Close chat interface (entire sidebar container)
 function M.close()
+  if state.state.container_win and api.nvim_win_is_valid(state.state.container_win) then
+    -- Close the entire container window
+    api.nvim_win_close(state.state.container_win, true)
+  end
+  
+  -- Clean up buffers
   if state.state.chat_buf then
     pcall(api.nvim_buf_delete, state.state.chat_buf, { force = true })
   end
   if state.state.input_buf then
     pcall(api.nvim_buf_delete, state.state.input_buf, { force = true })
   end
-  -- Keep conversation history when closing chat (persist in session)
+  if state.state.status_buf then
+    pcall(api.nvim_buf_delete, state.state.status_buf, { force = true })
+  end
+  if state.state.container_buf then
+    pcall(api.nvim_buf_delete, state.state.container_buf, { force = true })
+  end
+  
+  -- Reset state
   state.state.chat_buf = nil
   state.state.input_buf = nil
+  state.state.status_buf = nil
+  state.state.container_buf = nil
+  state.state.container_win = nil
+  state.state.result_win = nil
+  state.state.input_win = nil
+  state.state.status_win = nil
 end
 
 -- Toggle chat interface
 function M.toggle()
-  if state.state.chat_buf and api.nvim_buf_is_valid(state.state.chat_buf) then
+  if state.state.container_win and api.nvim_win_is_valid(state.state.container_win) then
     M.close()
   else
     M.create_interface()
@@ -202,15 +281,14 @@ end
 
 -- Scroll chat window to bottom
 function M.scroll_to_bottom()
-  local chat_win = vim.fn.bufwinnr(state.state.chat_buf)
-  if chat_win ~= -1 and api.nvim_win_is_valid(chat_win) then
+  if state.state.result_win and api.nvim_win_is_valid(state.state.result_win) then
     local lines = api.nvim_buf_get_lines(state.state.chat_buf, 0, -1, false)
     local line_count = #lines
     if line_count > 0 then
       -- Position cursor at the end of the last line
       local last_line_content = lines[line_count]
       local cursor_col = math.max(0, #last_line_content)
-      pcall(api.nvim_win_set_cursor, chat_win, {line_count, cursor_col})
+      pcall(api.nvim_win_set_cursor, state.state.result_win, {line_count, cursor_col})
     end
   end
 end

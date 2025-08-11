@@ -125,10 +125,9 @@ function M.add_input_prompt()
   api.nvim_buf_set_lines(state.state.input_buf, 0, -1, false, {"**Ask:** "})
   
   -- Switch to input window and position cursor
-  local input_win = vim.fn.bufwinnr(state.state.input_buf)
-  if input_win ~= -1 and api.nvim_win_is_valid(input_win) then
-    api.nvim_set_current_win(input_win)
-    pcall(api.nvim_win_set_cursor, input_win, {1, 7}) -- After "**Ask:** "
+  if state.state.input_win and api.nvim_win_is_valid(state.state.input_win) then
+    api.nvim_set_current_win(state.state.input_win)
+    pcall(api.nvim_win_set_cursor, state.state.input_win, {1, 7}) -- After "**Ask:** "
     vim.cmd("startinsert")
   end
 end
