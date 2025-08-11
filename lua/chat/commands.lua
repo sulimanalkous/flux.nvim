@@ -1,8 +1,8 @@
 local M = {}
 local api = vim.api
 
--- Chat state (shared with init.lua)
-local chat = require("chat")
+-- Chat state (shared across modules)
+local state = require("chat.state")
 
 function M.setup()
   -- Will be implemented during migration
@@ -147,12 +147,12 @@ function M.show_buffer_picker()
     
     if idx == 1 then
       -- Unpin buffer
-      chat.state.pinned_buffer = nil
+      state.state.pinned_buffer = nil
       require("chat.ui").add_to_chat("**System:** Buffer unpinned. #{buffer} will now reference the current active file.")
     else
       -- Pin selected buffer
       local selected_buf = buffers[idx - 1] -- -1 because we added unpin option at index 1
-      chat.state.pinned_buffer = selected_buf.bufnr
+              state.state.pinned_buffer = selected_buf.bufnr
       require("chat.ui").add_to_chat("**System:** Buffer pinned: **" .. selected_buf.basename .. "**")
       require("chat.ui").add_to_chat("**System:** #{buffer} will now always reference <buffer>" .. selected_buf.basename .. "</buffer>")
     end
