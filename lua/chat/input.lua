@@ -1,8 +1,8 @@
 local M = {}
 local api = vim.api
 
--- Chat state (shared with init.lua)
-local chat = require("chat")
+-- Chat state (shared across modules)
+local state = require("chat.state")
 
 function M.setup()
   -- Will be implemented during migration
@@ -11,7 +11,7 @@ end
 -- Send message to LLM
 function M.send_message()
   -- Get the last line (input line) from the chat buffer
-  local all_lines = api.nvim_buf_get_lines(chat.state.chat_buf, 0, -1, false)
+  local all_lines = api.nvim_buf_get_lines(state.state.chat_buf, 0, -1, false)
   local last_line = all_lines[#all_lines] or ""
   local message = last_line:gsub("^%*%*Ask:%*%* ", ""):trim()
 
@@ -21,7 +21,7 @@ function M.send_message()
   end
 
   -- Remove the input line and add user message
-  api.nvim_buf_set_lines(chat.state.chat_buf, #all_lines - 1, #all_lines, false, {})
+  api.nvim_buf_set_lines(state.state.chat_buf, #all_lines - 1, #all_lines, false, {})
   require("chat.ui").add_to_chat("**You:** " .. message)
   require("chat.ui").add_to_chat("")
 
@@ -92,7 +92,7 @@ end
 function M.add_input_prompt()
   require("chat.ui").add_to_chat("**Ask:** ")
   -- Move cursor to the input line
-  local lines = api.nvim_buf_get_lines(chat.state.chat_buf, 0, -1, false)
+  local lines = api.nvim_buf_get_lines(state.state.chat_buf, 0, -1, false)
   api.nvim_win_set_cursor(api.nvim_get_current_win(), {#lines, 7}) -- After "**Ask:** "
   vim.cmd("startinsert")
 end

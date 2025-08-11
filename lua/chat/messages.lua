@@ -1,8 +1,8 @@
 local M = {}
 local api = vim.api
 
--- Chat state (shared with init.lua)
-local chat = require("chat")
+-- Chat state (shared across modules)
+local state = require("chat.state")
 
 function M.setup()
   -- Will be implemented during migration
@@ -16,7 +16,7 @@ function M.process_regular_message(message)
 
   local enhanced_message_base = M.build_enhanced_prompt(message)
   local full_response_chunks = {}
-  chat.state.is_streaming = false -- Reset streaming state
+  state.state.is_streaming = false -- Reset streaming state
 
   -- Step 1: Get embedding for the user's query
   require("ui.progress").update(handle, "Generating query embedding...")
@@ -83,7 +83,7 @@ function M.handle_stream_finish(success, reason, user_message, full_response_chu
   
   require("chat.ui").add_to_chat("\n\n---")
   require("chat.ui").add_to_chat("")
-  chat.state.is_streaming = false
+  state.state.is_streaming = false
   -- Save full response to history
   local full_response = table.concat(full_response_chunks, "")
   M.add_to_history(user_message, full_response)
@@ -173,10 +173,10 @@ end
 -- Get current buffer context for chat
 function M.get_current_buffer_context()
   -- If we have a pinned buffer, use that
-  if chat.state.pinned_buffer and api.nvim_buf_is_valid(chat.state.pinned_buffer) then
-    local lines = api.nvim_buf_get_lines(chat.state.pinned_buffer, 0, -1, false)
-    local filename = api.nvim_buf_get_name(chat.state.pinned_buffer)
-    local filetype = vim.bo[chat.state.pinned_buffer].filetype
+  if state.state.pinned_buffer and api.nvim_buf_is_valid(state.state.pinned_buffer) then
+    local lines = api.nvim_buf_get_lines(state.state.pinned_buffer, 0, -1, false)
+    local filename = api.nvim_buf_get_name(state.state.pinned_buffer)
+    local filetype = vim.bo[state.state.pinned_buffer].filetype
     
     -- Ensure we have valid data
     if filename and filename ~= "" then
@@ -185,7 +185,7 @@ function M.get_current_buffer_context()
         basename = vim.fn.fnamemodify(filename, ":t"),
         filetype = filetype or "",
         lines = lines or {},
-        bufnr = chat.state.pinned_buffer,
+        bufnr = state.state.pinned_buffer,
         is_pinned = true
       }
     end
@@ -193,7 +193,7 @@ function M.get_current_buffer_context()
   
   -- Otherwise, get the current active buffer (dynamic)
   local current_buf = vim.fn.bufnr('#') ~= -1 and vim.fn.bufnr('#') or vim.fn.bufnr('%')
-  if current_buf == chat.state.chat_buf or current_buf == chat.state.input_buf then
+  if current_buf == state.state.chat_buf or current_buf == state.state.input_buf then
     -- Try to find the last code buffer
     for i = 1, vim.fn.bufnr('$') do
       if api.nvim_buf_is_valid(i) and vim.bo[i].buftype == "" then
@@ -225,12 +225,12 @@ end
 
 -- Get conversation history for context
 function M.get_conversation_context()
-  if #chat.state.conversation_history == 0 then
+  if #state.state.conversation_history == 0 then
     return ""
   end
   
   local context = "\n**Previous conversation context:**\n"
-  for i, exchange in ipairs(chat.state.conversation_history) do
+  for i, exchange in ipairs(state.state.conversation_history) do
     -- Include more context for recent conversations
     local user_preview = exchange.user:sub(1, 150)
     local assistant_preview = exchange.assistant:sub(1, 200)
@@ -247,14 +247,14 @@ end
 
 -- Add to conversation history
 function M.add_to_history(user_message, assistant_response)
-  table.insert(chat.state.conversation_history, {
+  table.insert(state.state.conversation_history, {
     user = user_message,
     assistant = assistant_response
   })
   
   -- Keep only last 10 exchanges to prevent memory bloat
-  if #chat.state.conversation_history > 10 then
-    table.remove(chat.state.conversation_history, 1)
+  if #state.state.conversation_history > 10 then
+    table.remove(state.state.conversation_history, 1)
   end
 end
 
@@ -292,7 +292,7 @@ function M.handle_complex_reasoning(message)
     function(success, reason) 
       if success then
         require("chat.ui").add_to_chat("\n\n---")
-        chat.state.is_streaming = false
+        state.state.is_streaming = false
       else
         require("chat.streaming").update_chat_stream("\n\n**Error:** " .. reason)
       end

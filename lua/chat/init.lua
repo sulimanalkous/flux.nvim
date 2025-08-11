@@ -1,13 +1,7 @@
 local M = {}
 
--- Chat state
-M.state = {
-  chat_buf = nil,
-  input_buf = nil,
-  pinned_buffer = nil,
-  conversation_history = {},
-  is_streaming = false
-}
+-- Import shared state
+local state = require("chat.state")
 
 -- Load all chat modules
 local ui = require("chat.ui")

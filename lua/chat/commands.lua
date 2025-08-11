@@ -164,7 +164,7 @@ end
 
 -- Clear conversation history
 function M.clear_history()
-  chat.state.conversation_history = {}
+  state.state.conversation_history = {}
   vim.notify("Conversation history cleared", vim.log.levels.INFO)
 end
 

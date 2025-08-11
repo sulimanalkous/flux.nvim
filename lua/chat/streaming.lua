@@ -1,8 +1,8 @@
 local M = {}
 local api = vim.api
 
--- Chat state (shared with init.lua)
-local chat = require("chat")
+-- Chat state (shared across modules)
+local state = require("chat.state")
 
 function M.setup()
   -- Will be implemented during migration
@@ -10,18 +10,18 @@ end
 
 -- Update chat with a streaming response chunk
 function M.update_chat_stream(chunk)
-  if not chat.state.chat_buf or not api.nvim_buf_is_valid(chat.state.chat_buf) then return end
+  if not state.state.chat_buf or not api.nvim_buf_is_valid(state.state.chat_buf) then return end
 
   -- Filter out vim.NIL chunks
   if not chunk or chunk == vim.NIL or tostring(chunk) == "vim.NIL" then
     return
   end
 
-  local lines = api.nvim_buf_get_lines(chat.state.chat_buf, 0, -1, false)
+  local lines = api.nvim_buf_get_lines(state.state.chat_buf, 0, -1, false)
   
-  if chat.state.is_streaming == false then
+  if state.state.is_streaming == false then
     -- First chunk, replace "thinking..."
-    chat.state.is_streaming = true
+    state.state.is_streaming = true
     for i = #lines, 1, -1 do
       if lines[i]:match("%*thinking%.%.%.%*") or lines[i]:match("%*processing%.%.%.%*") then
         lines[i] = "**LLM:** " .. chunk
@@ -46,19 +46,19 @@ function M.update_chat_stream(chunk)
     end
   end
 
-  api.nvim_buf_set_lines(chat.state.chat_buf, 0, -1, false, lines)
+  api.nvim_buf_set_lines(state.state.chat_buf, 0, -1, false, lines)
   require("chat.ui").scroll_to_bottom()
 end
 
 -- Update chat with final response
 function M.update_chat_response_full(response)
   -- Validate chat buffer exists and is valid
-  if not chat.state.chat_buf or not api.nvim_buf_is_valid(chat.state.chat_buf) then
+  if not state.state.chat_buf or not api.nvim_buf_is_valid(state.state.chat_buf) then
     vim.notify("Chat buffer is invalid, cannot update response", vim.log.levels.ERROR)
     return
   end
   
-  local lines = api.nvim_buf_get_lines(chat.state.chat_buf, 0, -1, false)
+  local lines = api.nvim_buf_get_lines(state.state.chat_buf, 0, -1, false)
   
   -- Remove "thinking..." line (look for it more carefully)
   for i = #lines, 1, -1 do
@@ -86,7 +86,7 @@ function M.update_chat_response_full(response)
   table.insert(lines, "---")
   table.insert(lines, "")
 
-  api.nvim_buf_set_lines(chat.state.chat_buf, 0, -1, false, lines)
+  api.nvim_buf_set_lines(state.state.chat_buf, 0, -1, false, lines)
 
   -- Auto-scroll to bottom
   require("chat.ui").scroll_to_bottom()
