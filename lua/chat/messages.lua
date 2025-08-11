@@ -33,7 +33,7 @@ function M.process_regular_message(message)
   provider:embed(message, function(query_embedding, err_embed)
     if err_embed or not query_embedding then
       vim.notify("Flux.nvim: Failed to get query embedding: " .. (err_embed or "Unknown error"), vim.log.levels.WARN)
-      vim.notify("Flux.nvim: Using FALLBACK path (no embedding)", vim.log.levels.DEBUG)
+      vim.notify("Flux.nvim: Using FALLBACK path (no embedding) (ID: " .. (state.state.current_message_id or "none") .. ")", vim.log.levels.DEBUG)
       -- Fallback to non-augmented prompt if embedding fails
       local fallback_prompt = enhanced_message_base .. "\n\n**Note**: Project context unavailable due to embedding service issue. Please respond based on general knowledge and ask the user to run :FluxIndexProject if they need project-specific help."
       provider:stream(fallback_prompt,
@@ -42,7 +42,10 @@ function M.process_regular_message(message)
           require("chat.streaming").update_chat_stream(chunk) 
           table.insert(full_response_chunks, chunk) 
         end,
-        function(success, reason) M.handle_stream_finish(success, reason, message, full_response_chunks) end
+        function(success, reason) 
+          vim.notify("Flux.nvim: Fallback stream finish called with success: " .. tostring(success) .. " (ID: " .. (state.state.current_message_id or "none") .. ")", vim.log.levels.DEBUG)
+          M.handle_stream_finish(success, reason, message, full_response_chunks) 
+        end
       )
       return
     end
@@ -74,14 +77,17 @@ function M.process_regular_message(message)
 
     -- Step 4: Send to LLM with augmented prompt
     require("ui.progress").update(handle, "Sending augmented request to LLM...")
-    vim.notify("Flux.nvim: Starting LLM stream for message: " .. message:sub(1, 30), vim.log.levels.DEBUG)
+    vim.notify("Flux.nvim: Starting LLM stream for message: " .. message:sub(1, 30) .. " (ID: " .. (state.state.current_message_id or "none") .. ")", vim.log.levels.DEBUG)
     provider:stream(augmented_prompt,
       function(chunk) 
         require("ui.progress").complete(handle, "Receiving response...") 
         require("chat.streaming").update_chat_stream(chunk) 
         table.insert(full_response_chunks, chunk) 
       end,
-      function(success, reason) M.handle_stream_finish(success, reason, message, full_response_chunks) end
+      function(success, reason) 
+        vim.notify("Flux.nvim: Stream finish called with success: " .. tostring(success) .. " (ID: " .. (state.state.current_message_id or "none") .. ")", vim.log.levels.DEBUG)
+        M.handle_stream_finish(success, reason, message, full_response_chunks) 
+      end
     )
   end)
 end
@@ -120,7 +126,9 @@ function M.build_enhanced_prompt(user_message)
     context = nil
   end
   
-  local prompt = [[You are an intelligent AI coding assistant and thinking partner. You should act like a helpful colleague who can reason, plan, and work with the user to solve problems together.
+  local prompt = [[You are an intelligent AI coding assistant and thinking partner for the Flux.nvim plugin project. You should act like a helpful colleague who can reason, plan, and work with the user to solve problems together.
+
+**IMPORTANT**: You are specifically working with the Flux.nvim Neovim plugin codebase. When users ask about "flux" or "flux.nvim", they are referring to THIS specific Neovim plugin, not the general Flux framework or any other Flux-related technology.
 
 **Your Personality & Approach:**
 - Think step-by-step and explain your reasoning
@@ -180,6 +188,7 @@ function M.build_enhanced_prompt(user_message)
 "\n\nRemember our previous conversation and build upon it. Think through this request step-by-step and respond naturally as a helpful coding partner." ..
 "\n\n**RESPONSE STYLE**: For general questions, project discussions, and explanations, respond conversationally without using @COMMAND format. Only use @COMMAND format when you need to perform actual file operations (read, edit, create, update files)." ..
 "\n\n**PROJECT UNDERSTANDING**: If the user asks about the project, use the project context provided above to give them detailed, accurate information about their codebase, architecture, and functionality. Respond conversationally, not with file commands." ..
+"\n\n**FLUX.NVIM SPECIFIC**: When users ask about 'flux' or 'flux.nvim', they are asking about THIS specific Neovim plugin. Always refer to the project context to provide accurate information about the Flux.nvim plugin's features, architecture, and implementation." ..
 "\n\nBe helpful, think out loud, and work with the user to solve problems together!"
 
   -- Debug: Log the prompt length to ensure it's not too long
