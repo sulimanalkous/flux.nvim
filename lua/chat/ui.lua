@@ -78,11 +78,6 @@ function M.create_interface()
   local input_win = api.nvim_get_current_win()
   api.nvim_win_set_buf(input_win, state.state.input_buf)
   
-  -- Calculate input height (20% of container height)
-  local container_height = api.nvim_win_get_height(container_win)
-  local input_height = math.floor(container_height * 0.2)
-  api.nvim_win_set_height(input_win, input_height)
-  
   -- Set options for input window
   api.nvim_win_set_option(input_win, "wrap", true)
   api.nvim_win_set_option(input_win, "linebreak", true)
@@ -96,10 +91,6 @@ function M.create_interface()
   local status_win = api.nvim_get_current_win()
   api.nvim_win_set_buf(status_win, state.state.status_buf)
   
-  -- Calculate status height (5% of container height)
-  local status_height = math.floor(container_height * 0.05)
-  api.nvim_win_set_height(status_win, status_height)
-  
   -- Set options for status window
   api.nvim_win_set_option(status_win, "wrap", false)
   api.nvim_win_set_option(status_win, "linebreak", false)
@@ -108,6 +99,20 @@ function M.create_interface()
   state.state.result_win = result_win
   state.state.input_win = input_win
   state.state.status_win = status_win
+  
+  -- Now set the window heights properly
+  -- Get the total container height
+  local container_height = api.nvim_win_get_height(container_win)
+  
+  -- Calculate heights (result gets remaining space, input 20%, status 5%)
+  local input_height = math.max(3, math.floor(container_height * 0.2))
+  local status_height = math.max(1, math.floor(container_height * 0.05))
+  
+  -- Set the heights
+  api.nvim_win_set_height(input_win, input_height)
+  api.nvim_win_set_height(status_win, status_height)
+  
+  -- Result window will automatically take the remaining space
   
   -- Set initial content for result window
   local welcome_lines = {
