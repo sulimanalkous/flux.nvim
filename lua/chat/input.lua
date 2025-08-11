@@ -124,7 +124,13 @@ function M.add_input_prompt()
   require("chat.ui").add_to_chat("**Ask:** ")
   -- Move cursor to the input line
   local lines = api.nvim_buf_get_lines(state.state.chat_buf, 0, -1, false)
-  api.nvim_win_set_cursor(api.nvim_get_current_win(), {#lines, 7}) -- After "**Ask:** "
+  local line_count = #lines
+  if line_count > 0 then
+    -- Ensure cursor position is within bounds
+    local cursor_line = math.max(1, line_count)
+    local cursor_col = math.min(7, #lines[cursor_line])
+    pcall(api.nvim_win_set_cursor, api.nvim_get_current_win(), {cursor_line, cursor_col})
+  end
   vim.cmd("startinsert")
 end
 

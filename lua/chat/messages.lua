@@ -23,14 +23,16 @@ function M.process_regular_message(message)
 
   local enhanced_message_base = M.build_enhanced_prompt(message)
   local full_response_chunks = {}
-  state.state.is_streaming = false -- Reset streaming state
+  -- Don't reset streaming state here - it should be managed by the input module
 
-  -- Step 1: Get embedding for the user's query
-  require("ui.progress").update(handle, "Generating query embedding...")
-  local providers = require("providers")
-  local provider = providers.get_provider()
-  
-  provider:embed(message, function(query_embedding, err_embed)
+      -- Step 1: Get embedding for the user's query
+    require("ui.progress").update(handle, "Generating query embedding...")
+    local providers = require("providers")
+    local provider = providers.get_provider()
+    
+    vim.notify("Flux.nvim: Starting embedding for query: " .. message:sub(1, 30), vim.log.levels.DEBUG)
+    
+    provider:embed(message, function(query_embedding, err_embed)
     if err_embed or not query_embedding then
       vim.notify("Flux.nvim: Failed to get query embedding: " .. (err_embed or "Unknown error"), vim.log.levels.WARN)
       vim.notify("Flux.nvim: Using FALLBACK path (no embedding) (ID: " .. (state.state.current_message_id or "none") .. ")", vim.log.levels.DEBUG)
