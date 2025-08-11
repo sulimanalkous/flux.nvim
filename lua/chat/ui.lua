@@ -97,8 +97,15 @@ function M.setup_keymaps()
   pcall(vim.keymap.del, {"n", "i"}, "<C-s>", { buffer = state.state.input_buf })
   pcall(vim.keymap.del, "n", "q", { buffer = state.state.chat_buf })
   
-  -- Send message with Ctrl+S
-  vim.keymap.set({"n", "i"}, "<C-s>", function()
+  -- Check if keymap already exists to prevent duplicates
+  local existing_keymap = vim.keymap.get("i", "<C-s>", { buffer = state.state.input_buf })
+  if existing_keymap then
+    vim.notify("Flux.nvim: Keymap already exists, skipping setup", vim.log.levels.DEBUG)
+    return
+  end
+  
+  -- Send message with Ctrl+S (only in insert mode to prevent conflicts)
+  vim.keymap.set("i", "<C-s>", function()
     require("chat.input").send_message()
   end, opts)
   

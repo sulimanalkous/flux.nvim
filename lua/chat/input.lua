@@ -10,9 +10,15 @@ end
 
 -- Send message to LLM
 function M.send_message()
-  -- Prevent multiple simultaneous sends
+  -- Prevent multiple simultaneous sends with more robust checking
   if state.state.is_streaming then
     vim.notify("Already processing a message, please wait...", vim.log.levels.WARN)
+    return
+  end
+  
+  -- Additional protection: check if we're already processing this exact message
+  if state.state.processing_message then
+    vim.notify("Message already being processed, please wait...", vim.log.levels.WARN)
     return
   end
 
@@ -26,11 +32,24 @@ function M.send_message()
     return
   end
 
+  -- Generate unique message ID to prevent duplicate processing
+  local message_id = os.time() .. "_" .. math.random(1000, 9999)
+  state.state.current_message_id = message_id
+  
   -- Set streaming state to prevent multiple sends
   state.state.is_streaming = true
+  state.state.processing_message = true
 
   -- Debug: Log the message being sent
-  vim.notify("Flux.nvim: Sending message: " .. message:sub(1, 50), vim.log.levels.DEBUG)
+  vim.notify("Flux.nvim: Sending message: " .. message:sub(1, 50) .. " (ID: " .. message_id .. ", streaming: " .. tostring(state.state.is_streaming) .. ")", vim.log.levels.DEBUG)
+  
+  -- Check if this is being triggered by Enter key
+  local mode = vim.fn.mode()
+  vim.notify("Flux.nvim: Current mode: " .. mode, vim.log.levels.DEBUG)
+  
+  -- Add call stack trace for debugging
+  local trace = debug.traceback()
+  vim.notify("Flux.nvim: Call stack: " .. trace:sub(1, 200), vim.log.levels.DEBUG)
 
   -- Remove the input line and add user message
   api.nvim_buf_set_lines(state.state.chat_buf, #all_lines - 1, #all_lines, false, {})

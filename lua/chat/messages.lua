@@ -10,6 +10,13 @@ end
 
 -- Process regular message
 function M.process_regular_message(message)
+  -- Check if this is the current message being processed
+  local current_id = state.state.current_message_id
+  if not current_id then
+    vim.notify("Flux.nvim: No message ID found, skipping", vim.log.levels.WARN)
+    return
+  end
+  
   local handle = require("ui.progress").start_chat("Processing request...", "chat_" .. os.time())
 
   require("chat.ui").add_to_chat("**LLM:** *thinking...*")
@@ -26,6 +33,7 @@ function M.process_regular_message(message)
   provider:embed(message, function(query_embedding, err_embed)
     if err_embed or not query_embedding then
       vim.notify("Flux.nvim: Failed to get query embedding: " .. (err_embed or "Unknown error"), vim.log.levels.WARN)
+      vim.notify("Flux.nvim: Using FALLBACK path (no embedding)", vim.log.levels.DEBUG)
       -- Fallback to non-augmented prompt if embedding fails
       local fallback_prompt = enhanced_message_base .. "\n\n**Note**: Project context unavailable due to embedding service issue. Please respond based on general knowledge and ask the user to run :FluxIndexProject if they need project-specific help."
       provider:stream(fallback_prompt,
@@ -38,6 +46,8 @@ function M.process_regular_message(message)
       )
       return
     end
+    
+    vim.notify("Flux.nvim: Using NORMAL path (with embedding)", vim.log.levels.DEBUG)
 
     -- Step 2: Find relevant chunks from project index
     require("ui.progress").update(handle, "Finding relevant context...")
@@ -64,6 +74,7 @@ function M.process_regular_message(message)
 
     -- Step 4: Send to LLM with augmented prompt
     require("ui.progress").update(handle, "Sending augmented request to LLM...")
+    vim.notify("Flux.nvim: Starting LLM stream for message: " .. message:sub(1, 30), vim.log.levels.DEBUG)
     provider:stream(augmented_prompt,
       function(chunk) 
         require("ui.progress").complete(handle, "Receiving response...") 
@@ -77,6 +88,13 @@ end
 
 -- Helper function to handle stream finish (extracted for clarity)
 function M.handle_stream_finish(success, reason, user_message, full_response_chunks)
+  -- Check if this is the current message being processed
+  local current_id = state.state.current_message_id
+  if not current_id then
+    vim.notify("Flux.nvim: Stream finish called without message ID, skipping", vim.log.levels.WARN)
+    return
+  end
+  
   if not success then
     require("chat.streaming").update_chat_stream("\n\n**Error:** " .. reason)
   end
@@ -84,6 +102,8 @@ function M.handle_stream_finish(success, reason, user_message, full_response_chu
   require("chat.ui").add_to_chat("\n\n---")
   require("chat.ui").add_to_chat("")
   state.state.is_streaming = false
+  state.state.processing_message = false
+  state.state.current_message_id = nil -- Clear the message ID
   -- Save full response to history
   local full_response = table.concat(full_response_chunks, "")
   M.add_to_history(user_message, full_response)
