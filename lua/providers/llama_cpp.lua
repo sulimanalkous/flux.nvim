@@ -52,8 +52,14 @@ function M:generate(prompt, callback)
       if data and #data > 0 then
         local response = table.concat(data, "")
         local success, result = pcall(vim.fn.json_decode, response)
-        if success and result.choices and result.choices[1] then
-          callback(result.choices[1].message.content, nil)
+        if success and result.choices and result.choices[1] and result.choices[1].message and result.choices[1].message.content then
+          local content = result.choices[1].message.content
+          -- Validate content is a string and not vim.NIL
+          if content and content ~= vim.NIL and type(content) == "string" then
+            callback(content, nil)
+          else
+            callback(nil, "Invalid response content")
+          end
         else
           callback(nil, "Failed to parse response")
         end
@@ -101,8 +107,11 @@ function M:stream(prompt, on_chunk, on_complete)
               local success, result = pcall(vim.fn.json_decode, json_str)
               if success and result.choices and result.choices[1] and result.choices[1].delta and result.choices[1].delta.content then
                 local chunk = result.choices[1].delta.content
-                full_response = full_response .. chunk
-                on_chunk(chunk)
+                -- Validate chunk is a string and not vim.NIL
+                if chunk and chunk ~= vim.NIL and type(chunk) == "string" then
+                  full_response = full_response .. chunk
+                  on_chunk(chunk)
+                end
               end
             else
               on_complete(true, nil)
