@@ -25,7 +25,7 @@ function M.send_message()
   -- Get the input line from the input buffer
   local input_lines = api.nvim_buf_get_lines(state.state.input_buf, 0, -1, false)
   local input_line = input_lines[1] or ""
-  local message = input_line:gsub("^%*%*Ask:%*%* ", ""):trim()
+  local message = vim.trim(input_line:gsub("^%*%*Ask:%*%* ", ""))
 
   if message == "" then
     vim.notify("Please enter a message", vim.log.levels.WARN)
@@ -41,15 +41,7 @@ function M.send_message()
   state.state.processing_message = true
 
   -- Debug: Log the message being sent
-  vim.notify("Flux.nvim: Sending message: " .. message:sub(1, 50) .. " (ID: " .. message_id .. ", streaming: " .. tostring(state.state.is_streaming) .. ")", vim.log.levels.DEBUG)
-  
-  -- Check if this is being triggered by Enter key
-  local mode = vim.fn.mode()
-  vim.notify("Flux.nvim: Current mode: " .. mode, vim.log.levels.DEBUG)
-  
-  -- Add call stack trace for debugging
-  local trace = debug.traceback()
-  vim.notify("Flux.nvim: Call stack: " .. trace:sub(1, 200), vim.log.levels.DEBUG)
+  vim.notify("Flux.nvim: Sending message: " .. message:sub(1, 50) .. " (ID: " .. message_id .. ")", vim.log.levels.DEBUG)
 
   -- Clear input buffer and add user message to result buffer
   api.nvim_buf_set_lines(state.state.input_buf, 0, -1, false, {"**Ask:** "})

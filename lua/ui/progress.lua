@@ -94,6 +94,12 @@ function M.pop_handle(id)
   return handle
 end
 
+-- Setup function
+function M.setup()
+  -- Nothing to setup for progress module
+  -- It's ready to use immediately
+end
+
 -- Get appropriate title based on operation type
 function M.get_operation_title(operation_type)
   local titles = {

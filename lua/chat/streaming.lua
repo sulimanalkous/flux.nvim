@@ -115,6 +115,9 @@ function M.process_llm_response(response, user_message)
   local remaining_text = response
   
   -- Process @UPDATE commands (for existing files)
+  if remaining_text:find("@UPDATE") then
+    vim.notify("Flux.nvim: Found @UPDATE command in response", vim.log.levels.INFO)
+  end
   while remaining_text:find("@UPDATE") do
     local before_update, filename, after_update = remaining_text:match("^(.-)@UPDATE%s+(.-)%s*\n(.*)$")
     if not filename then
@@ -140,6 +143,7 @@ function M.process_llm_response(response, user_message)
       local file_ops = require("tools").get_tool("file_ops")
       local update_result = file_ops.handle_update(filename:trim(), file_content)
       processed_response = processed_response .. "\n**[📝 Updated file]** " .. update_result .. "\n\n"
+      vim.notify("Flux.nvim: File updated: " .. filename:trim(), vim.log.levels.INFO)
     else
       break
     end

@@ -100,22 +100,61 @@ function M.create_interface()
   state.state.input_win = input_win
   state.state.status_win = status_win
   
-  -- Now set the window heights properly using vim.cmd for better compatibility
-  -- Switch to input window and resize it
-  api.nvim_set_current_win(input_win)
-  local input_height = 2  -- Fixed small height for input
-  vim.cmd("resize " .. input_height)
+  -- Try using api.nvim_win_set_height with a delay
+  vim.notify("Flux.nvim: Attempting to resize windows...", vim.log.levels.DEBUG)
   
-  -- Switch to status window and resize it
-  api.nvim_set_current_win(status_win)
-  local status_height = 1  -- Fixed small height for status
-  vim.cmd("resize " .. status_height)
+  -- Set heights using API - make status window even smaller
+  pcall(api.nvim_win_set_height, input_win, 2)
+  pcall(api.nvim_win_set_height, status_win, 1)
   
-  -- Switch back to input window for focus
-  api.nvim_set_current_win(input_win)
+  -- Try to make status window as small as possible
+  vim.cmd("wincmd j")  -- Move to status window
+  vim.cmd("resize 1")  -- Force it to 1 line
+  vim.cmd("wincmd k")  -- Move back to input window
   
-  -- Debug: Print the heights we're setting
-  vim.notify("Flux.nvim: Set input height to " .. input_height .. ", status height to " .. status_height, vim.log.levels.DEBUG)
+  -- Force a redraw
+  vim.cmd("redraw!")
+  
+  -- Check the results
+  local final_input_height = vim.fn.winheight(input_win)
+  local final_status_height = vim.fn.winheight(status_win)
+  vim.notify("Flux.nvim: Final heights - input: " .. final_input_height .. ", status: " .. final_status_height, vim.log.levels.DEBUG)
+  
+  -- If input window is still too big, try a more aggressive approach
+  if final_input_height > 10 then
+    vim.notify("Flux.nvim: Input window still too big, trying alternative method...", vim.log.levels.DEBUG)
+    -- Try using vim.cmd with explicit window targeting
+    vim.cmd("wincmd j")  -- Move to input window
+    vim.cmd("resize 2")
+    vim.cmd("wincmd j")  -- Move to status window
+    vim.cmd("resize 1")
+    vim.cmd("wincmd k")  -- Move back to input window
+    
+    -- Check again
+    local new_input_height = vim.fn.winheight(input_win)
+    local new_status_height = vim.fn.winheight(status_win)
+    vim.notify("Flux.nvim: After alternative method - input: " .. new_input_height .. ", status: " .. new_status_height, vim.log.levels.DEBUG)
+  end
+  
+  -- Fix window heights if they're swapped
+  if final_input_height < final_status_height then
+    vim.notify("Flux.nvim: Window heights are swapped, fixing...", vim.log.levels.DEBUG)
+    -- Force the correct heights using API
+    pcall(api.nvim_win_set_height, input_win, 2)
+    pcall(api.nvim_win_set_height, status_win, 1)
+    
+    -- Also try vim.cmd approach
+    vim.cmd("wincmd j")  -- Move to input window
+    vim.cmd("resize 2")
+    vim.cmd("wincmd j")  -- Move to status window
+    vim.cmd("resize 1")
+    vim.cmd("wincmd k")  -- Move back to input window
+    
+    -- Check final heights
+    local fixed_input_height = vim.fn.winheight(input_win)
+    local fixed_status_height = vim.fn.winheight(status_win)
+    vim.notify("Flux.nvim: Fixed heights - input: " .. fixed_input_height .. ", status: " .. fixed_status_height, vim.log.levels.DEBUG)
+  end
   
   -- Set initial content for result window
   local welcome_lines = {

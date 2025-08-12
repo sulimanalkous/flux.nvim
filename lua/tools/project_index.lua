@@ -51,18 +51,37 @@ function M.process_file(file_path)
   -- Split content into chunks
   local chunks = M.split_into_chunks(content, file_path)
   
-  -- Generate embeddings for each chunk
+  -- Generate embeddings for each chunk synchronously
   local providers = require("providers")
   local provider = providers.get_provider()
   
   for i, chunk in ipairs(chunks) do
+    -- Use a synchronous approach with a promise-like pattern
+    local embedding_received = false
+    local embedding_result = nil
+    
     provider:embed(chunk.text, function(embedding, err)
       if embedding then
         chunk.embedding = embedding
+        embedding_received = true
+        embedding_result = embedding
       else
-        vim.notify("Failed to generate embedding for chunk " .. i .. " in " .. file_path, vim.log.levels.WARN)
+        vim.notify("Failed to generate embedding for chunk " .. i .. " in " .. file_path .. ": " .. (err or "Unknown error"), vim.log.levels.WARN)
+        embedding_received = true
+        embedding_result = nil
       end
     end)
+    
+    -- Wait for the embedding to complete (with timeout)
+    local timeout = 0
+    while not embedding_received and timeout < 100 do
+      vim.wait(10) -- Wait 10ms
+      timeout = timeout + 1
+    end
+    
+    if not embedding_received then
+      vim.notify("Timeout waiting for embedding for chunk " .. i .. " in " .. file_path, vim.log.levels.WARN)
+    end
   end
   
   return chunks

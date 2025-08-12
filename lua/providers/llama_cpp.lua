@@ -143,6 +143,11 @@ function M:embed(text, callback)
   
   local json_data = vim.fn.json_encode(data)
   
+  -- Debug: Log the embedding request
+  vim.notify("Flux.nvim: Embedding request to " .. url .. " with model " .. self.config.embedding_model, vim.log.levels.DEBUG)
+  
+  local callback_called = false
+  
   local job_id = vim.fn.jobstart({
     "curl", "-s", "-X", "POST", url,
     "-H", "Content-Type: application/json",
@@ -151,19 +156,56 @@ function M:embed(text, callback)
     on_stdout = function(_, data, _)
       if data and #data > 0 then
         local response = table.concat(data, "")
+        -- Debug: Log the raw response (first 200 chars)
+        vim.notify("Flux.nvim: Embedding response length: " .. #response .. " chars", vim.log.levels.DEBUG)
+        
+        -- Skip empty responses
+        if #response == 0 then
+          vim.notify("Flux.nvim: Skipping empty response", vim.log.levels.DEBUG)
+          return
+        end
+        
+        vim.notify("Flux.nvim: Embedding response preview: " .. response:sub(1, 200), vim.log.levels.DEBUG)
+        
         local success, result = pcall(vim.fn.json_decode, response)
         if success and result.data and result.data[1] and result.data[1].embedding then
-          callback(result.data[1].embedding, nil)
+          local embedding = result.data[1].embedding
+          vim.notify("Flux.nvim: Successfully parsed embedding with " .. #embedding .. " dimensions", vim.log.levels.DEBUG)
+          if not callback_called then
+            callback_called = true
+            callback(embedding, nil)
+          end
         else
-          callback(nil, "Failed to parse embedding response")
+          local error_msg = "Failed to parse embedding response"
+          if not success then
+            error_msg = error_msg .. " (JSON decode failed: " .. tostring(result) .. ")"
+          elseif not result.data then
+            error_msg = error_msg .. " (no data field)"
+          elseif not result.data[1] then
+            error_msg = error_msg .. " (no first data item)"
+          elseif not result.data[1].embedding then
+            error_msg = error_msg .. " (no embedding field)"
+          end
+          vim.notify("Flux.nvim: " .. error_msg, vim.log.levels.DEBUG)
+          if not callback_called then
+            callback_called = true
+            callback(nil, error_msg)
+          end
         end
       else
-        callback(nil, "No embedding response received")
+        if not callback_called then
+          callback_called = true
+          callback(nil, "No embedding response received")
+        end
       end
     end,
     on_stderr = function(_, data, _)
       local error_msg = table.concat(data, "")
-      callback(nil, "Embedding request failed: " .. error_msg)
+      vim.notify("Flux.nvim: Embedding stderr: " .. error_msg, vim.log.levels.DEBUG)
+      if not callback_called then
+        callback_called = true
+        callback(nil, "Embedding request failed: " .. error_msg)
+      end
     end
   })
   

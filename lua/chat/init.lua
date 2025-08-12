@@ -19,6 +19,9 @@ M.commands = commands
 M.streaming = streaming
 M.markdown = markdown
 
+-- Expose state for external access
+M.state = state.state
+
 -- Initialize chat system
 function M.setup()
   -- Initialize all modules
